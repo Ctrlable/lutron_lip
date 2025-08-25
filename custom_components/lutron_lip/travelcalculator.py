@@ -15,6 +15,7 @@ TODO: check vs current travelcalculator
 
 from enum import Enum
 import time
+import math
 
 
 class PositionType(Enum):
@@ -138,7 +139,7 @@ class TravelCalculator:
             return self.travel_to_position
         progress = (self.current_time() - self.travel_started_time) / travel_time
         position = self.last_known_position + relative_position * progress
-        return int(position)
+        return math.ceil(position)
 
     def _calculate_travel_time(self, relative_position):
         """Calculate time to travel to relative position."""
