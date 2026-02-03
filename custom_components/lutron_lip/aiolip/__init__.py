@@ -108,7 +108,7 @@ class LutronController:
             self.connect_lock = asyncio.Lock()
         async with self.connect_lock:
             if not self.connected:
-                await self.lip.async_connect(self.host)
+                await self.lip.async_connect(self.host, self.user, self.password)
                 if self.connected:
                     self.hass.loop.create_task(self.lip.async_run())
                     self.lip.set_callback(self._dispatch_message)

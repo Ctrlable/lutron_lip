@@ -181,6 +181,8 @@ class LIP:
         self.controller_type = None
         self._socket = None
         self._host = None
+        self._username = LIP_USERNAME  # Default fallback
+        self._password = LIP_PASSWORD  # Default fallback
         self._parser = LIPParser()
         self._read_connect_lock = asyncio.Lock()
         self._disconnect_event = asyncio.Event()
@@ -191,7 +193,7 @@ class LIP:
         self._keep_alive_task = None
         self.loop = None
 
-    async def async_connect(self, server_addr):
+    async def async_connect(self, server_addr, username=None, password=None):
         """Connect to the bridge via LIP."""
         self.loop = asyncio.get_event_loop()
 
@@ -199,6 +201,12 @@ class LIP:
             raise LIPConnectionStateError
 
         self._disconnect_event.clear()
+
+        # Store credentials for reconnection
+        if username is not None:
+            self._username = username
+        if password is not None:
+            self._password = password
 
         try:
             await self._async_connect(server_addr)
@@ -220,7 +228,9 @@ class LIP:
         await self.action(LIPMode.MONITORING, 10, 1)  # SysVar
 
     async def _async_connect(self, server_addr):
-        """Make the connection."""
+        """Make the connection.
+        It uses _username and _password stored in the class because this method is called
+        also from the reconnect method."""
         _LOGGER.debug("Connecting to %s", server_addr)
         self.connection_state = LIPConnectionState.CONNECTING
         reader, writer = await asyncio.wait_for(
@@ -235,11 +245,11 @@ class LIP:
         _verify_expected_response(
             await self._socket.async_readuntil(" "), LIP_PROTOCOL_LOGIN
         )
-        await self._socket.async_write_command(LIP_USERNAME)
+        await self._socket.async_write_command(self._username)
         _verify_expected_response(
             await self._socket.async_readuntil(" "), LIP_PROTOCOL_PASSWORD
         )
-        await self._socket.async_write_command(LIP_PASSWORD)
+        await self._socket.async_write_command(self._password)
 
         controller_type = await self._socket.async_readuntil(" ")
 
