@@ -178,7 +178,7 @@ class OptionsFlowHandler(OptionsFlow):
         for cover in covers:
             legacy_uuid = cover["legacy_uuid"]
             name = cover["name"]
-            key = f"{legacy_uuid}_travel_time"
+            key = f"{name}_travel_time"
             default = config.get(key, 10)  # 10 seconds default travel time
             schema_dict[
                 vol.Required(

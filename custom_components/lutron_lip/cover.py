@@ -25,8 +25,9 @@ from homeassistant.const import (
 
 from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_platform
+from homeassistant.core import HomeAssistant, callback, ServiceCall
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity_component import DATA_INSTANCES
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback, async_get_current_platform
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
@@ -108,6 +109,129 @@ async def async_setup_entry(
         SERVICE_SET_KNOWN_ACTION, ACTION_SCHEMA, "set_known_action"
     )
 
+    # Forwarder services under this integration domain to allow calling on groups
+    # and have them applied to member Lutron cover entities.
+    ent_reg = er.async_get(hass)
+
+    def _expand_cover_groups(entity_ids: list[str]) -> list[str]:
+        expanded: list[str] = []
+        for eid in entity_ids:
+            state = hass.states.get(eid)
+            # Cover group entities (platform: group) expose a list of member entity_ids
+            # in their state attributes under 'entity_id'.
+            members = state.attributes.get("entity_id") if state else None
+            if isinstance(members, (list, tuple)):
+                expanded.extend(members)
+            else:
+                expanded.append(eid)
+        # De-duplicate while preserving order
+        seen = set()
+        result: list[str] = []
+        for eid in expanded:
+            if eid not in seen:
+                seen.add(eid)
+                result.append(eid)
+        return result
+
+    def _filter_lutron_covers(entity_ids: list[str]) -> list[str]:
+        filtered: list[str] = []
+        for eid in entity_ids:
+            ent = ent_reg.async_get(eid)
+            if ent and ent.domain == COVER_DOMAIN and ent.platform == DOMAIN:
+                filtered.append(eid)
+        return filtered
+
+    async def _prepare_forward(call: ServiceCall, debug_service_name: str) -> tuple[list[str] | None, dict | None]:
+        # Start with any entities provided (will expand HA "group.*" via helper)
+        base_ids = list(await async_extract_entity_ids(hass, call))
+        if not base_ids and ATTR_ENTITY_ID in call.data:
+            data_eids = call.data.get(ATTR_ENTITY_ID)
+            if isinstance(data_eids, str):
+                base_ids = [data_eids]
+            elif isinstance(data_eids, (list, tuple)):
+                base_ids = list(data_eids)
+
+        # Expand cover group entities into their members
+        expanded = _expand_cover_groups(base_ids)
+
+        # Keep only this integration's cover entities
+        targets = _filter_lutron_covers(expanded)
+        if not targets:
+            _LOGGER.debug(
+                "No Lutron cover entities to forward %s to (input: %s)",
+                debug_service_name, base_ids
+            )
+            return None, None
+
+        payload = {k: v for k, v in call.data.items() if k != ATTR_ENTITY_ID}
+        payload[ATTR_ENTITY_ID] = targets
+        return targets, payload
+
+    async def _forward_known_position(call: ServiceCall) -> None:
+        targets, payload = await _prepare_forward(call, "set_known_position")
+        if not targets:
+            return
+
+        component = (hass.data.get(DATA_INSTANCES) or {}).get(COVER_DOMAIN)
+        if component is None:
+            _LOGGER.debug("EntityComponent for domain %s not available", COVER_DOMAIN)
+            return
+
+        kwargs = {k: v for k, v in payload.items() if k != ATTR_ENTITY_ID}
+
+        for eid in targets:
+            ent = component.get_entity(eid)
+            if not ent:
+                _LOGGER.debug("Entity %s not found in %s component", eid, COVER_DOMAIN)
+                continue
+            method = getattr(ent, "set_known_position", None)
+            if not method:
+                _LOGGER.debug("Entity %s has no set_known_position method; skipping", eid)
+                continue
+            try:
+                await method(**kwargs)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Failed set_known_position on %s", eid)
+
+    async def _forward_known_action(call: ServiceCall) -> None:
+        targets, payload = await _prepare_forward(call, "set_known_action")
+        if not targets:
+            return
+
+        component = (hass.data.get(DATA_INSTANCES) or {}).get(COVER_DOMAIN)
+        if component is None:
+            _LOGGER.debug("EntityComponent for domain %s not available", COVER_DOMAIN)
+            return
+
+        kwargs = {k: v for k, v in payload.items() if k != ATTR_ENTITY_ID}
+
+        for eid in targets:
+            ent = component.get_entity(eid)
+            if not ent:
+                _LOGGER.debug("Entity %s not found in %s component", eid, COVER_DOMAIN)
+                continue
+            method = getattr(ent, "set_known_action", None)
+            if not method:
+                _LOGGER.debug("Entity %s has no set_known_action method; skipping", eid)
+                continue
+            try:
+                await method(**kwargs)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Failed set_known_action on %s", eid)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_KNOWN_POSITION,
+        _forward_known_position,
+        schema=POSITION_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_KNOWN_ACTION,
+        _forward_known_action,
+        schema=ACTION_SCHEMA,
+    )
+
 
 class LutronCoverTimeBased(LutronOutput, CoverEntity, RestoreEntity):
     """Representation of a Lutron motor.
@@ -175,7 +299,7 @@ class LutronCoverTimeBased(LutronOutput, CoverEntity, RestoreEntity):
             else:
                 self._assume_uncertain_position = str(state) == str(True)
 
-        travel_time_key = f"cover.{self._lutron_device.legacy_uuid}_travel_time"
+        travel_time_key = f"cover.{self.device_name}_travel_time"
         travel_time_value = self._config_entry.options.get(travel_time_key, 5)
         # Assign the values
         self._travel_time_up = int(travel_time_value)
@@ -198,7 +322,8 @@ class LutronCoverTimeBased(LutronOutput, CoverEntity, RestoreEntity):
     @property
     def extra_state_attributes(self):
         """Return the device state attributes."""
-        attr = {}
+
+        attr = {"lutron_integration_id": self._lutron_device.integration_id}
         if self._travel_time_down is not None:
             attr[CONF_TRAVELLING_TIME_DOWN] = self._travel_time_down
         if self._travel_time_up is not None:
