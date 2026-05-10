@@ -91,6 +91,7 @@ class LIPAction(IntEnum):
     OUTPUT_START_LOWERING = 3
     OUTPUT_STOP = 4
     OUTPUT_FLASH = 5
+    OUTPUT_SPECTRUM = 17  # Ketra/PHANTOM_SPECTRUM color temperature (deci-Kelvin, e.g. 27000 = 2700K)
     OUTPUT_MOTOR_JOG_RAISE = 18
     OUTPUT_MOTOR_JOG_LOWER = 19
     OUTPUT_UNDOCUMENTED_29 = (
