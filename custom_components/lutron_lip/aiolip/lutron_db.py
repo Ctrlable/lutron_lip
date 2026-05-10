@@ -142,6 +142,8 @@ class LutronXmlDbParser:
                     "QS_IO_INTERFACE",
                     "GRAFIK_T_HYBRID_KEYPAD",
                     "HWI_SLIM",
+                    "PALLADIOM_KEYPAD",
+                    "GRAFIK_EYE_QS",
                 ):
                     keypad = self._parse_keypad(
                         area, device_xml, device_group, device_type
@@ -175,6 +177,8 @@ class LutronXmlDbParser:
         # Note that device_group.get('Name') is the real name of the keypad and motion sensor
         name = keypad_xml.get("Name")
         device_group_name = device_group.get("Name")
+        raw_serial = keypad_xml.get("SerialNumber")
+        serial_number = raw_serial if raw_serial and raw_serial != "0" else None
         keypad = Keypad(
             area=area,
             name=name,
@@ -182,6 +186,7 @@ class LutronXmlDbParser:
             device_group_name=device_group_name,
             integration_id=int(keypad_xml.get("IntegrationID")),
             uuid=keypad_xml.get("UUID"),
+            serial_number=serial_number,
         )
         components = keypad_xml.find("Components")
         if components is None:
@@ -601,6 +606,7 @@ class Keypad(Device):
 
     device_type: str | None = None
     device_group_name: str | None = None
+    serial_number: str | None = None
     buttons: list = field(default_factory=list)
     leds: list = field(default_factory=list)
     components: dict[int, Any] = field(default_factory=dict, repr=False)

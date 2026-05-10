@@ -35,6 +35,25 @@ CONNECTION_STATE_CONNECTED = "connected"
 CONNECTION_STATE_DISCONNECTED = "disconnected"
 CONNECTION_STATE_CONNECTING = "connecting"
 
+# Human-readable names for Lutron keypad device types (used in DeviceInfo model field)
+KEYPAD_DEVICE_TYPE_NAMES: dict[str, str] = {
+    "PHANTOM": "Phantom Keypad",
+    "HWI_SEETOUCH_KEYPAD": "HWI SeeTouch Keypad",
+    "SEETOUCH_KEYPAD": "SeeTouch Keypad",
+    "SEETOUCH_TABLETOP_KEYPAD": "SeeTouch Tabletop Keypad",
+    "PICO_KEYPAD": "Pico Keypad",
+    "HYBRID_SEETOUCH_KEYPAD": "Hybrid SeeTouch Keypad",
+    "MAIN_REPEATER": "Main Repeater",
+    "HOMEOWNER_KEYPAD": "Homeowner Keypad",
+    "INTERNATIONAL_SEETOUCH_KEYPAD": "International SeeTouch Keypad",
+    "WCI": "WCI",
+    "QS_IO_INTERFACE": "QS IO Interface",
+    "GRAFIK_T_HYBRID_KEYPAD": "GRAFIK T Hybrid Keypad",
+    "HWI_SLIM": "HWI Slim Keypad",
+    "PALLADIOM_KEYPAD": "Palladiom Keypad",
+    "GRAFIK_EYE_QS": "GRAFIK Eye QS",
+}
+
 # Device types
 DEVICE_TYPE_LIGHT = "light"
 DEVICE_TYPE_COVER = "cover"

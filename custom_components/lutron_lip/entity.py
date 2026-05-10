@@ -8,7 +8,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .aiolip import Device, KeypadComponent, LutronController, Output, Sysvar
-from .const import DOMAIN
+from .const import DOMAIN, KEYPAD_DEVICE_TYPE_NAMES
 
 
 class LutronBaseEntity(Entity):
@@ -154,10 +154,14 @@ class LutronKeypadComponent(LutronBaseEntity):
         """
         super().__init__(lutron_device, controller)
         self._component_number = lutron_device.component_number
+        keypad = lutron_device.keypad
+        model = KEYPAD_DEVICE_TYPE_NAMES.get(keypad.device_type, keypad.device_type)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, str(self._lutron_device.integration_id))},
             manufacturer="Lutron",
             name=self.device_name,
+            model=model,
+            serial_number=keypad.serial_number,
             suggested_area=self.area_name,
         )
         if lutron_device.keypad.device_type == "MAIN_REPEATER":
