@@ -8,7 +8,6 @@ from typing import Any
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
-    ATTR_COLOR_TEMP_KELVIN,
     ATTR_TRANSITION,
     ColorMode,
     LightEntity,
@@ -68,10 +67,6 @@ def fade_time_seconds(seconds):
     return str(timedelta(seconds=seconds))
 
 
-KETRA_MIN_COLOR_TEMP_KELVIN = 1400
-KETRA_MAX_COLOR_TEMP_KELVIN = 10000
-
-
 class LutronLight(LutronOutput, LightEntity):
     """Representation of a Lutron Light, including dimmable.
 
@@ -93,34 +88,18 @@ class LutronLight(LutronOutput, LightEntity):
         """Initialize the device."""
         super().__init__(lutron_device, controller)
         self._config_entry = config_entry
-        if self._lutron_device.is_spectrum:
-            self._attr_color_mode = ColorMode.COLOR_TEMP
-            self._attr_supported_color_modes = {ColorMode.COLOR_TEMP}
-            self._attr_min_color_temp_kelvin = KETRA_MIN_COLOR_TEMP_KELVIN
-            self._attr_max_color_temp_kelvin = KETRA_MAX_COLOR_TEMP_KELVIN
-            self._attr_supported_features = LightEntityFeature.TRANSITION
-        elif self._lutron_device.is_dimmable:
+        if self._lutron_device.is_dimmable:
             self._attr_color_mode = ColorMode.BRIGHTNESS
             self._attr_supported_color_modes = {ColorMode.BRIGHTNESS}
             self._attr_supported_features = (
                 LightEntityFeature.TRANSITION | LightEntityFeature.FLASH
             )
 
-    async def async_added_to_hass(self) -> None:
-        """Register callbacks."""
-        await super().async_added_to_hass()
-        if self._lutron_device.is_spectrum:
-            self._controller.subscribe(
-                self._lutron_device.integration_id, "spectrum", self._spectrum_callback
-            )
-
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
-        if ATTR_COLOR_TEMP_KELVIN in kwargs and self._lutron_device.is_spectrum:
-            await self._execute_device_command(
-                self._lutron_device.set_color_temp_kelvin, kwargs[ATTR_COLOR_TEMP_KELVIN]
-            )
 
+        # if flash := kwargs.get(ATTR_FLASH):
+        #     return self._lutron_device.flash(0.5 if flash == "short" else 1.5)
         if ATTR_BRIGHTNESS in kwargs and self._lutron_device.is_dimmable:
             brightness = kwargs[ATTR_BRIGHTNESS]
         elif self._prev_brightness == 0:
@@ -128,6 +107,7 @@ class LutronLight(LutronOutput, LightEntity):
                 CONF_DEFAULT_DIMMER_LEVEL, DEFAULT_DIMMER_LEVEL
             )
         else:
+            # light is already on and is not dimmable
             brightness = self._prev_brightness
         self._prev_brightness = brightness
         new_level = to_lutron_level(brightness)
@@ -147,21 +127,16 @@ class LutronLight(LutronOutput, LightEntity):
     async def _request_state(self) -> None:
         """Request the state of the light."""
         await self._execute_device_command(self._lutron_device.get_level)
-        if self._lutron_device.is_spectrum:
-            await self._execute_device_command(self._lutron_device.get_color_temp)
 
-    def _update_callback(self, value: float) -> None:
+    def _update_callback(self, value: float):
         """Handle level update for light brightness."""
+        # new level for this output
         self._attr_is_on = value > 0
         hass_level = to_hass_level(value)
         self._attr_brightness = hass_level
         if self._prev_brightness is None or hass_level != 0:
             self._prev_brightness = hass_level
-        self.async_write_ha_state()
 
-    def _spectrum_callback(self, value: float) -> None:
-        """Handle color temperature update from Ketra (action 17, deci-Kelvin)."""
-        self._attr_color_temp_kelvin = int(value / 10)
         self.async_write_ha_state()
 
 

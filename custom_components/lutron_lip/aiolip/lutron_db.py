@@ -451,7 +451,6 @@ class Output(Device):
 
     is_dimmable: bool = field(init=False, default=False)
     is_light: bool = field(init=False, default=False)
-    is_spectrum: bool = field(init=False, default=False)
     is_shade: bool = field(init=False, default=False)
     is_motor: bool = field(init=False, default=False)
     is_fan: bool = field(init=False, default=False)
@@ -478,7 +477,6 @@ class Output(Device):
         else:
             self.is_light = True
             self.is_dimmable = not t.startswith("NON_DIM")
-            self.is_spectrum = t == "PHANTOM_SPECTRUM"
 
     def set_level(self, level: float, fade_time: str | None = None) -> LIPCommand:
         """Return a command to set the output level."""
@@ -487,14 +485,6 @@ class Output(Device):
     def get_level(self) -> LIPCommand:
         """Return a command to get the output level."""
         return self._query(LIPAction.OUTPUT_LEVEL)
-
-    def set_color_temp_kelvin(self, kelvin: int) -> LIPCommand:
-        """Return a command to set the Ketra color temperature. Protocol value is Kelvin × 10."""
-        return self._execute(LIPAction.OUTPUT_SPECTRUM, value=float(kelvin * 10))
-
-    def get_color_temp(self) -> LIPCommand:
-        """Return a command to query the Ketra color temperature."""
-        return self._query(LIPAction.OUTPUT_SPECTRUM)
 
     def start_raising(self) -> LIPCommand:
         """Return a command to start raising the motor."""

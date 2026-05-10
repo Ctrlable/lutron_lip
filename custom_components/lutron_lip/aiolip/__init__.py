@@ -155,11 +155,6 @@ class LutronController:
                     # Optionally log or handle unknown message types
                     _LOGGER.debug("Unhandled LIP message: %s", msg)
 
-        if msg.mode == LIPMode.OUTPUT and msg.action_number == LIPAction.OUTPUT_SPECTRUM:
-            spectrum_key = (msg.integration_id, "spectrum")
-            for cb in self._subscribers.get(spectrum_key, []):
-                cb(msg.value)
-
     async def execute_command(self, command: LIPCommand) -> None:
         """Execute a LIPCommand."""
         await self._ensure_connected()
