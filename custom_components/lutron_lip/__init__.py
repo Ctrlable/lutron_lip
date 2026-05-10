@@ -230,18 +230,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                     )
 
             for led in keypad.leds:
-                if (
-                    use_radiora_mode
-                    and not led.button.name.startswith("Unknown")
-                    and led.button.button_type in RADIORA_VALID_BUTTON_TYPES
-                ) or (not use_radiora_mode and led.button.led_logic == 5):
+                if led.button is not None:
                     entry_data.leds.append(led)
-                    platform = Platform.SWITCH if use_radiora_mode else Platform.LIGHT
-
                     _async_check_entity_unique_id(
                         hass,
                         entity_registry,
-                        platform,
+                        Platform.SWITCH,
                         led.uuid,
                         led.legacy_uuid,
                         entry_data.controller.guid,

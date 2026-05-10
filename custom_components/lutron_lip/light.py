@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import timedelta
 import logging
 from typing import Any
@@ -18,10 +17,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import CONF_USE_RADIORA_MODE, DOMAIN, LutronData
-from .aiolip import Led, LIPLedState, LutronController, Output
+from . import DOMAIN, LutronData
+from .aiolip import LutronController, Output
 from .const import CONF_DEFAULT_DIMMER_LEVEL, DEFAULT_DIMMER_LEVEL
-from .entity import LutronKeypadComponent, LutronOutput
+from .entity import LutronOutput
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,9 +39,6 @@ async def async_setup_entry(
     """
     _LOGGER.debug("Setting up Lutron light platform")
     entry_data: LutronData = hass.data[DOMAIN][config_entry.entry_id]
-    use_radiora_mode = config_entry.options.get(
-        CONF_USE_RADIORA_MODE, config_entry.data.get(CONF_USE_RADIORA_MODE, False)
-    )
 
     async_add_entities(
         (
@@ -52,15 +48,6 @@ async def async_setup_entry(
         True,
     )
     _LOGGER.debug("Lutron light platform setup complete")
-
-    if not use_radiora_mode:
-        async_add_entities(
-            (
-                LutronLedLight(device, entry_data.controller)
-                for device in entry_data.leds
-            ),
-            True,
-        )
 
 
 def to_lutron_level(level):
@@ -153,44 +140,3 @@ class LutronLight(LutronOutput, LightEntity):
         self.async_write_ha_state()
 
 
-class LutronLedLight(LutronKeypadComponent, LightEntity):
-    """Representation of a Lutron Led."""
-
-    _lutron_device: Led
-    _attr_is_on: bool | None = None
-    _attr_color_mode = ColorMode.ONOFF
-    _attr_supported_color_modes = {ColorMode.ONOFF}
-    _attr_supported_features = LightEntityFeature.FLASH
-
-    def __init__(
-        self,
-        lutron_device: Led,
-        controller: LutronController,
-    ) -> None:
-        """Initialize the device."""
-        super().__init__(lutron_device, controller)
-        self._attr_name = lutron_device.name
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the light on."""
-        await self._execute_device_command(self._lutron_device.turn_on)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the light off."""
-        await self._execute_device_command(self._lutron_device.turn_off)
-
-    async def _request_state(self):
-        await self._execute_device_command(self._lutron_device.get_state)
-
-    def _update_callback(self, value: int):
-        """Handle device LED state update."""
-        self._attr_is_on = value == LIPLedState.ON
-        self.async_write_ha_state()
-
-    @property
-    def extra_state_attributes(self) -> Mapping[str, Any] | None:
-        """Return the state attributes."""
-        return {
-            "keypad": self.keypad_name,
-            "led": self.name,
-        }

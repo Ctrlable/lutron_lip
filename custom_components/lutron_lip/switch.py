@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import CONF_USE_RADIORA_MODE, DOMAIN, LutronData
+from . import DOMAIN, LutronData
 from .aiolip import Led, LIPLedState, LutronController
 from .entity import LutronKeypadComponent, LutronOutput
 
@@ -27,26 +27,17 @@ async def async_setup_entry(
     """
     entry_data: LutronData = hass.data[DOMAIN][config_entry.entry_id]
 
-    use_radiora_mode = config_entry.options.get(
-        CONF_USE_RADIORA_MODE, config_entry.data.get(CONF_USE_RADIORA_MODE, False)
-    )
-
     # Add Lutron Switches
     async_add_entities(
         (LutronSwitch(device, entry_data.controller) for device in entry_data.switches),
         True,
     )
 
-    # Add Led as switches if radiora mode
-    # Add the indicator LEDs for scenes (keypad buttons)
-    if use_radiora_mode:
-        async_add_entities(
-            (
-                LutronLedSwitch(device, entry_data.controller)
-                for device in entry_data.leds
-            ),
-            True,
-        )
+    # Add LED switches for every keypad button that has an LED
+    async_add_entities(
+        (LutronLedSwitch(device, entry_data.controller) for device in entry_data.leds),
+        True,
+    )
 
 
 class LutronSwitch(LutronOutput, SwitchEntity):

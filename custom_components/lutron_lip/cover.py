@@ -574,6 +574,7 @@ class LutronCover(LutronOutput, CoverEntity):
     _attr_supported_features = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
+        | CoverEntityFeature.STOP
         | CoverEntityFeature.SET_POSITION
     )
 
@@ -598,6 +599,10 @@ class LutronCover(LutronOutput, CoverEntity):
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Open the cover."""
         await self._execute_device_command(self._lutron_device.set_level, 100)
+
+    async def async_stop_cover(self, **kwargs: Any) -> None:
+        """Stop the shade."""
+        await self._execute_device_command(self._lutron_device.stop)
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the shade to a specific position."""
