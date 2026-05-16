@@ -14,6 +14,7 @@ import homeassistant.helpers.config_validation as cv
 from .aiolip import Button, Led, LutronController, OccupancyGroup, Output, Sysvar
 from .const import (
     CONF_REFRESH_DATA,
+    CONF_SUGGEST_AREAS,
     CONF_USE_AREA_FOR_DEVICE_NAME,
     CONF_USE_FULL_PATH,
     CONF_USE_RADIORA_MODE,
@@ -106,6 +107,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     use_radiora_mode = get_entry_value(
         config_entry, CONF_USE_RADIORA_MODE, False
     )  # use compatibility mode for old integration
+    suggest_areas = get_entry_value(config_entry, CONF_SUGGEST_AREAS, True)
     variable_ids_str = get_entry_value(config_entry, CONF_VARIABLE_IDS, "")
     variable_ids = [
         int(v.strip()) for v in variable_ids_str.split(",") if v.strip().isdigit()
@@ -114,7 +116,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     lutron_data_file = hass.config.path(LUTRON_DATA_FILE)
 
     lutron_controller = LutronController(
-        hass, host, uid, pwd, use_full_path, use_area_for_device_name, use_radiora_mode
+        hass, host, uid, pwd, use_full_path, use_area_for_device_name, use_radiora_mode,
+        suggest_areas=suggest_areas,
     )
     await hass.async_add_executor_job(
         lambda: lutron_controller.load_xml_db(

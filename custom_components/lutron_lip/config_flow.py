@@ -25,6 +25,7 @@ from . import LutronController, LutronData
 from .const import (
     CONF_DEFAULT_DIMMER_LEVEL,
     CONF_REFRESH_DATA,
+    CONF_SUGGEST_AREAS,
     CONF_USE_AREA_FOR_DEVICE_NAME,
     CONF_USE_FULL_PATH,
     CONF_USE_RADIORA_MODE,
@@ -162,6 +163,9 @@ class OptionsFlowHandler(OptionsFlow):
             ): bool,
             vol.Required(
                 CONF_USE_RADIORA_MODE, default=config.get(CONF_USE_RADIORA_MODE, False)
+            ): bool,
+            vol.Required(
+                CONF_SUGGEST_AREAS, default=config.get(CONF_SUGGEST_AREAS, True)
             ): bool,
             vol.Optional(
                 CONF_VARIABLE_IDS, default=config.get(CONF_VARIABLE_IDS, "")

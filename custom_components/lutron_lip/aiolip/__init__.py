@@ -65,6 +65,7 @@ class LutronController:
         use_full_path: bool,
         use_area_for_device_name: bool,
         use_radiora_mode: bool,
+        suggest_areas: bool = True,
     ) -> None:
         """Initialize the Lutron controller.
 
@@ -76,6 +77,7 @@ class LutronController:
             use_full_path: Whether to use full path for area names
             use_area_for_device_name: Whether to include area in device names
             use_radiora_mode: Whether to use RadioRA compatibility mode
+            suggest_areas: Whether to suggest Lutron areas when registering devices
 
         """
         self.hass = hass
@@ -94,6 +96,7 @@ class LutronController:
         self.use_full_path = use_full_path
         self.use_area_for_device_name = use_area_for_device_name
         self.use_radiora_mode = use_radiora_mode
+        self.suggest_areas = suggest_areas
 
     @property
     def connected(self) -> bool:

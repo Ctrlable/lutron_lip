@@ -8,6 +8,7 @@ CONF_USE_FULL_PATH = "use_full_path"
 CONF_USE_AREA_FOR_DEVICE_NAME = "use_area_for_device_name"
 CONF_VARIABLE_IDS = "variable_ids"
 CONF_USE_RADIORA_MODE = "use_radiora_mode"
+CONF_SUGGEST_AREAS = "suggest_areas"
 
 # Connection settings
 CONF_CONNECTION_TIMEOUT = "connection_timeout"
