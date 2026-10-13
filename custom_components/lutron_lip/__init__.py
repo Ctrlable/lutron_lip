@@ -8,11 +8,13 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import slugify
 
 from .aiolip import Button, Led, LutronController, OccupancyGroup, Output, Sysvar
+from .aiolip.exceptions import LIPLoginError, LIPProtocolError
 from .const import (
     CONF_REFRESH_DATA,
     CONF_SUGGEST_AREAS,
@@ -126,7 +128,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             lutron_data_file, refresh_data, variable_ids=variable_ids
         )
     )
-    await lutron_controller.connect()
+    try:
+        await lutron_controller.connect()
+    except LIPLoginError as err:
+        # Ctrlable Pro then offers "re-enter credentials" (async_step_reauth).
+        raise ConfigEntryAuthFailed(str(err)) from err
+    except (OSError, TimeoutError, LIPProtocolError) as err:
+        msg = f"Lutron processor at {host}: {err}"
+        raise ConfigEntryNotReady(msg) from err
     _LOGGER.info("Connected to main repeater at %s", host)
 
     entity_registry = er.async_get(hass)

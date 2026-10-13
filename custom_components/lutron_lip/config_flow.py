@@ -1,6 +1,7 @@
 """Config flow to configure the Lutron integration."""
 
 from __future__ import annotations
+import contextlib
 import logging
 from typing import Any
 from urllib.error import HTTPError
@@ -14,7 +15,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -22,6 +23,7 @@ from homeassistant.helpers.selector import (
 )
 
 from . import LutronController, LutronData
+from .aiolip.exceptions import LIPLoginError
 from .const import (
     CONF_DEFAULT_DIMMER_LEVEL,
     CONF_REFRESH_DATA,
@@ -46,6 +48,39 @@ def get_lutron_covers(hass, config_entry):
         {"legacy_uuid": f"cover.{device.legacy_uuid}", "name": device.name}
         for device in entry_data.covers
     ]
+
+
+async def async_try_login(
+    hass: HomeAssistant, host: str, username: str, password: str
+) -> str | None:
+    """
+    Log in over LIP once and log out: return None, or the form error to show.
+
+    The system data (the XML) downloads without any login, so before this the
+    form accepted a wrong username or password and the entry failed later with
+    a protocol error (2026-10-13, 9360-balada).
+    """
+    controller = LutronController(
+        hass,
+        host,
+        username,
+        password,
+        use_full_path=False,
+        use_area_for_device_name=False,
+        use_radiora_mode=False,
+    )
+    try:
+        await controller.connect()
+    except LIPLoginError:
+        return "invalid_auth"
+    except Exception:  # noqa: BLE001 -- unreachable, refused, timed out, not LIP
+        _LOGGER.debug("Lutron LIP login test to %s failed", host, exc_info=True)
+        return "cannot_connect"
+    finally:
+        if controller.lip is not None:
+            with contextlib.suppress(Exception):
+                await controller.lip.async_stop()
+    return None
 
 
 class LutronRonModifiedConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -104,6 +139,13 @@ class LutronRonModifiedConfigFlow(ConfigFlow, domain=DOMAIN):
                 if len(guid) <= 10:
                     errors["base"] = "cannot_connect"
 
+            if not errors and (
+                login_error := await async_try_login(
+                    self.hass, ip_address, username, password
+                )
+            ):
+                errors["base"] = login_error
+
             if not errors:
                 await self.async_set_unique_id(guid)
                 self._abort_if_unique_id_configured()
@@ -124,6 +166,46 @@ class LutronRonModifiedConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_VARIABLE_IDS, default=""): str,
                 }
             ),
+            errors=errors,
+        )
+
+    async def async_step_reauth(self, _entry_data: dict[str, Any]) -> ConfigFlowResult:
+        """Start re-authentication: the processor refused the stored login."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask for the integration login again and test it before saving."""
+        entry = self._get_reauth_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if login_error := await async_try_login(
+                self.hass,
+                entry.data[CONF_HOST],
+                user_input[CONF_USERNAME],
+                user_input[CONF_PASSWORD],
+            ):
+                errors["base"] = login_error
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={
+                        CONF_USERNAME: user_input[CONF_USERNAME],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    },
+                )
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
+                    ): str,
+                    vol.Required(CONF_PASSWORD): str,
+                }
+            ),
+            description_placeholders={"host": entry.data[CONF_HOST]},
             errors=errors,
         )
 

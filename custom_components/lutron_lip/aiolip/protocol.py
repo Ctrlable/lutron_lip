@@ -9,7 +9,7 @@ import socket
 import time
 
 from .data import LIPMessage, LIPMode, LIPOperation
-from .exceptions import LIPConnectionStateError, LIPProtocolError
+from .exceptions import LIPConnectionStateError, LIPLoginError, LIPProtocolError
 
 LIP_PROTOCOL_LOGIN = "login: "
 LIP_PROTOCOL_PASSWORD = "password: "
@@ -210,9 +210,13 @@ class LIP:
 
         try:
             await self._async_connect(server_addr)
-        except TimeoutError:
-            _LOGGER.debug("Timed out while trying to connect to %s", server_addr)
+        except Exception as err:
+            # Any failure, not only a timeout: left in CONNECTING, the next
+            # attempt would refuse with LIPConnectionStateError forever.
+            _LOGGER.debug("Could not connect to %s: %s", server_addr, err)
             self.connection_state = LIPConnectionState.NOT_CONNECTED
+            if self._socket is not None:
+                self._socket.close()
             raise
 
         await self._async_setup_monitoring()
@@ -256,6 +260,12 @@ class LIP:
 
         controller_type = await self._socket.async_readuntil(" ")
 
+        # A refused login answers "bad login" -- read as far as "bad " -- and
+        # then asks for the login again.
+        if LIP_PROTOCOL_GENERIC_NET not in controller_type and (
+            "bad" in controller_type.lower() or "login" in controller_type.lower()
+        ):
+            raise LIPLoginError(controller_type)
         _verify_expected_response(controller_type, LIP_PROTOCOL_GENERIC_NET)
 
         if LIP_PROTOCOL_QNET in controller_type:

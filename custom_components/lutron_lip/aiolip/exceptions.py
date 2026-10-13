@@ -62,6 +62,24 @@ class LIPProtocolError(LutronException):
         return self.message
 
 
+class LIPLoginError(LIPProtocolError):
+    """
+    The processor refused the integration login ("bad login").
+
+    A LIPProtocolError too, so code that caught protocol errors still does.
+    """
+
+    def __init__(self, received: Any) -> None:
+        """Initialize login error."""
+        super().__init__(
+            received,
+            "NET> ",
+            "The Lutron processor rejected the integration login "
+            f"(it answered [{str(received).strip()}]). "
+            "Check the username and password.",
+        )
+
+
 class LutronConnectionError(LutronException):
     """Exception raised when connection to Lutron controller fails."""
 

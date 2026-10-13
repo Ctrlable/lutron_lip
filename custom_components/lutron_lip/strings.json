@@ -2,7 +2,8 @@
   "config": {
     "error": {
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "invalid_auth": "The Lutron processor rejected this username or password. Use the integration login set in the Lutron programming software (RadioRA 2 default: lutron / integration)."
     },
     "step": {
       "user": {
@@ -16,7 +17,18 @@
         },
         "description": "Please enter the main repeater login information",
         "title": "Main repeater setup"
+      },
+      "reauth_confirm": {
+        "title": "Lutron login rejected",
+        "description": "The Lutron processor at {host} refused the integration login. Enter the integration username and password set in the Lutron programming software (RadioRA 2 default: lutron / integration).",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
       }
+    },
+    "abort": {
+      "reauth_successful": "The new login works. Lutron LIP is reconnecting."
     }
   },
   "options": {
