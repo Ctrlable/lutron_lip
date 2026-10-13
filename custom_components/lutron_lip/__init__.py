@@ -294,6 +294,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     lutron_controller.ha_device_id = controller_device.id
 
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = entry_data
+    # Options (Suggest areas, naming, variables) are read only here, at setup:
+    # without this a changed option sat unused until the next restart.
+    config_entry.async_on_unload(config_entry.add_update_listener(_async_options_updated))
 
     _setup_button_events(hass, entry_data)
 
@@ -398,6 +401,19 @@ def _setup_button_events(hass: HomeAssistant, entry_data: LutronData) -> None:
         controller.subscribe(button.integration_id, button.component_number, _make_cb(full_id, btn_id, btn_uuid))
 
 
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Apply changed options by reloading the entry."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Clean up resources and entities associated with the integration."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
+    entry_data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    # Close the LIP session too, or a reload leaves the old one running beside
+    # the new one: two logins on the processor and every event handled twice.
+    lip = getattr(getattr(entry_data, "controller", None), "lip", None)
+    if lip is not None:
+        await lip.async_stop()
+    return True
